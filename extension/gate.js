@@ -8,7 +8,7 @@ async function refresh() {
   refreshing = true;
   try {
     ({ state, settings } = await request('STATUS'));
-    if (state.phase === 'ready' && (!challenge || Date.now() - challenge.at > 300000)) {
+    if (state.phase === 'ready' && !state.temporary && (!challenge || Date.now() - challenge.at > 300000)) {
       ({ state, settings, challenge } = await request('PREPARE'));
     }
     render();
@@ -18,11 +18,13 @@ async function refresh() {
 function render() {
   if (!state) return;
   const now = Date.now();
-  $('visual').classList.toggle('resting', state.phase === 'cooldown');
+  $('visual').classList.toggle('resting', state.phase === 'cooldown' && !state.temporary);
   $('visual').classList.toggle('eyes', state.phase === 'ready' && (challenge?.exercise || settings.exercise) === 'eyes');
   if (state.phase !== 'ready') $('visual').classList.remove('breathing');
   $('begin').hidden = false;
-  if (state.phase === 'cooldown') {
+  $('temporary').hidden = state.phase !== 'cooldown' || !!state.temporary;
+  $('temporary-note').hidden = $('temporary').hidden;
+  if (state.phase === 'cooldown' && !state.temporary) {
     challenge = null;
     $('visual').classList.add('resting');
     $('phase').textContent = duration(state.readyAt - now);
@@ -32,16 +34,17 @@ function render() {
     $('begin').hidden = true;
     $('detail').textContent = '休息结束后，也由你决定是否开始。';
     if (now >= state.readyAt) void refresh();
-  } else if (state.phase === 'active') {
+  } else if (state.phase === 'active' || state.temporary) {
+    const endsAt = state.temporary?.endsAt || state.endsAt;
     challenge = null;
-    $('phase').textContent = duration(state.endsAt - now);
+    $('phase').textContent = duration(endsAt - now);
     $('phase').className = 'phase count';
-    $('title').textContent = '继续本次浏览。';
+    $('title').textContent = state.temporary ? '临时访问中。' : '继续本次浏览。';
     $('description').textContent = '所有推特标签页，共享这段剩余时间。';
     $('begin').textContent = '继续本次浏览';
     $('begin').disabled = busy;
-    $('detail').textContent = `${timeLabel(state.endsAt)} 结束 · 本页不会增加浏览额度`;
-    if (now >= state.endsAt) void refresh();
+    $('detail').textContent = `${timeLabel(endsAt)} 结束 · 本页不会增加浏览额度`;
+    if (now >= endsAt) void refresh();
   } else {
     $('phase').className = 'phase';
     const elapsed = challenge ? now - challenge.at : 0;
@@ -72,3 +75,10 @@ window.addEventListener('pageshow', refresh);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
 setInterval(render, 250);
 void refresh();
+
+$('temporary').onclick = async () => {
+  $('temporary').disabled = true;
+  try { await request('TEMPORARY', { target }); }
+  catch (error) { $('error').textContent = error.message; }
+  finally { $('temporary').disabled = false; }
+};

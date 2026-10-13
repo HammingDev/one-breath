@@ -42,3 +42,27 @@ test('invalid settings fail instead of disabling restriction', () => {
   assert.throws(() => validateSettings({ ...DEFAULTS, cooldownMinutes: 0 }));
   assert.throws(() => validateSettings({ ...DEFAULTS, exercise: 'skip' }));
 });
+
+import { startTemporary, TEMPORARY_MS, accessState } from '../extension/model.js';
+test('temporary access retains original cooldown, including after early end', () => {
+  const cooling = finish(start(ready, DEFAULTS, 0, 1), 1000);
+  const temp = startTemporary(cooling, 2000, 2);
+  assert.equal(temp.readyAt, cooling.readyAt);
+  assert.equal(accessState(temp).endsAt, 2000 + TEMPORARY_MS);
+  assert.deepEqual(finish(temp, 3000), cooling);
+  assert.deepEqual(settle(temp, 2000 + TEMPORARY_MS), cooling);
+});
+test('temporary access cannot be extended by multiple starts or normal BEGIN', () => {
+  const temp = startTemporary({ phase: 'cooldown', endedAt: 0, readyAt: 3600000 }, 1000, 1);
+  assert.deepEqual(startTemporary(temp, 2000, 2), temp);
+  assert.deepEqual(start(temp, DEFAULTS, 2000, 2), temp);
+  assert.throws(() => startTemporary(ready, 0, 1));
+});
+test('cooldown can finish during temporary access without discarding its timer', () => {
+  const temp = startTemporary({ phase: 'cooldown', endedAt: 0, readyAt: 10000 }, 1000, 1);
+  const afterCooldown = settle(temp, 10000);
+  assert.equal(afterCooldown.phase, 'ready');
+  assert.equal(afterCooldown.temporary.endsAt, 181000);
+  assert.deepEqual(settle(afterCooldown, 181000), ready);
+  assert.deepEqual(finish(afterCooldown, 12000), ready);
+});

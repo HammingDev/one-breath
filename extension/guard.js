@@ -1,5 +1,5 @@
 (() => {
-  let deadline = 0, timer, checking = false, blocking = false;
+  let deadline = 0, timer, checking = false, blocking = false, temporary = false;
   const gate = chrome.runtime.getURL('gate.html');
   function block() {
     if (blocking) return;
@@ -13,6 +13,7 @@
     clearTimeout(timer);
     if (state.phase !== 'active' || state.endsAt <= Date.now()) { block(); return; }
     deadline = state.endsAt;
+    temporary = !!state.temporary;
     document.documentElement?.setAttribute('data-one-breath-allowed', '');
     timer = setTimeout(block, Math.max(0, deadline - Date.now()));
     mount();
@@ -23,7 +24,7 @@
     checking = true;
     try {
       const result = await chrome.runtime.sendMessage({ type: 'STATUS' });
-      if (!result?.ok) block(); else apply(result.state);
+      if (!result?.ok) block(); else apply(result.accessState);
     } catch { block(); } finally { checking = false; }
   }
   let label, host;
@@ -42,11 +43,11 @@
     if (deadline && Date.now() >= deadline) { block(); return; }
     if (label) {
       const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      label.textContent = `一息 · 剩余 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+      label.textContent = `一息 · ${temporary ? '临时访问' : '剩余'} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
     }
   }
   chrome.runtime.onMessage.addListener(msg => { if (msg.type === 'STATE') apply(msg.state); });
-  chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.state?.newValue) apply(changes.state.newValue); });
+  chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.state?.newValue) void check(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); void check(); } });
   window.addEventListener('focus', check);
   window.addEventListener('pageshow', check);
