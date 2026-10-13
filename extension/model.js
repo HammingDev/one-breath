@@ -1,4 +1,4 @@
-export const DEFAULTS = Object.freeze({ visitMinutes: 5, cooldownMinutes: 60, exercise: 'breath' });
+export const DEFAULTS = Object.freeze({ visitMinutes: 5, cooldownMinutes: 60, temporaryMinutes: 15, exercise: 'breath' });
 export function isTarget(raw) {
   try {
     const u = new URL(raw);
@@ -7,21 +7,22 @@ export function isTarget(raw) {
 }
 export function safeTarget(raw) { return isTarget(raw) ? raw : 'https://x.com/'; }
 export function validateSettings(input) {
-  const { visitMinutes, cooldownMinutes, exercise } = input;
+  const { visitMinutes, cooldownMinutes, exercise, temporaryMinutes = DEFAULTS.temporaryMinutes } = input;
   if (!Number.isInteger(visitMinutes) || visitMinutes < 1 || visitMinutes > 120) throw new Error('单次浏览时长应为 1–120 分钟的整数。');
   if (!Number.isInteger(cooldownMinutes) || cooldownMinutes < 1 || cooldownMinutes > 1440) throw new Error('冷却间隔应为 1–1440 分钟的整数。');
   if (!['breath', 'eyes'].includes(exercise)) throw new Error('请选择呼吸或眼睛休息。');
-  return { visitMinutes, cooldownMinutes, exercise };
+  if (!Number.isInteger(temporaryMinutes) || temporaryMinutes < 1 || temporaryMinutes > 120) throw new Error('临时访问时长应为 1–120 分钟的整数。');
+  return { visitMinutes, cooldownMinutes, exercise, temporaryMinutes };
 }
-export const TEMPORARY_MS = 3 * 60000;
+export const TEMPORARY_MS = DEFAULTS.temporaryMinutes * 60000;
 export function accessState(state) {
   return state.temporary ? { phase: 'active', endsAt: state.temporary.endsAt, temporary: true } : state;
 }
-export function startTemporary(state, now, tabId) {
+export function startTemporary(state, now, tabId, minutes = DEFAULTS.temporaryMinutes) {
   state = settle(state, now);
   if (state.temporary) return state;
   if (state.phase !== 'cooldown') throw new Error('临时访问仅在休息期间可用。');
-  return { ...state, temporary: { endsAt: now + TEMPORARY_MS, tabIds: [tabId] } };
+  return { ...state, temporary: { endsAt: now + minutes * 60000, tabIds: [tabId] } };
 }
 export function settle(state, now) {
   if (state.temporary && now >= state.temporary.endsAt) { const { temporary, ...rest } = state; state = rest; }
@@ -43,4 +44,11 @@ export function finish(state, now) {
 export function duration(ms) {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export function extendTemporary(state, now, expectedEndsAt) {
+  state = settle(state, now);
+  if (!state.temporary) throw new Error('临时访问已结束。');
+  if (state.temporary.endsAt !== expectedEndsAt) return state;
+  return { ...state, temporary: { ...state.temporary, endsAt: state.temporary.endsAt + 5 * 60000 } };
 }

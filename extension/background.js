@@ -1,4 +1,4 @@
-import { DEFAULTS, isTarget, safeTarget, validateSettings, settle, start, finish, startTemporary, accessState } from './model.js';
+import { DEFAULTS, isTarget, safeTarget, validateSettings, settle, start, finish, startTemporary, accessState, extendTemporary } from './model.js';
 const gate = chrome.runtime.getURL('gate.html');
 let state, settings, ruleMode;
 let queue = Promise.resolve();
@@ -64,6 +64,11 @@ function extensionUI(sender) { return sender.id === chrome.runtime.id && sender.
 async function handle(msg, sender) {
   if (sender.id !== chrome.runtime.id) throw new Error('无法识别请求来源。');
   if (msg.type === 'STATUS') return { state, settings, accessState: accessState(state) };
+  if (msg.type === 'EXTEND_TEMPORARY') {
+    if (!extensionUI(sender) && !isTarget(sender.url)) throw new Error('无法延长会话。');
+    state = extendTemporary(state, Date.now(), msg.endsAt); await persist();
+    return { state, settings, accessState: accessState(state) };
+  }
   if (msg.type === 'END') {
     if (!extensionUI(sender) && !isTarget(sender.url)) throw new Error('无法结束会话。');
     state = finish(state, Date.now()); await persist(); return { state, settings };
@@ -72,7 +77,7 @@ async function handle(msg, sender) {
   if (msg.type === 'TEMPORARY') {
     if (!state.temporary && state.phase !== 'cooldown') throw new Error('临时访问仅在休息期间可用。');
     const tab = isGate(sender.url) && sender.tab ? sender.tab : await chrome.tabs.create({ url: gate, active: true });
-    state = startTemporary(state, Date.now(), tab.id);
+    state = startTemporary(state, Date.now(), tab.id, settings.temporaryMinutes);
     if (!state.temporary.tabIds.includes(tab.id)) state = { ...state, temporary: { ...state.temporary, tabIds: [...state.temporary.tabIds, tab.id] } };
     await persist();
     await chrome.tabs.update(tab.id, { url: safeTarget(msg.target) });

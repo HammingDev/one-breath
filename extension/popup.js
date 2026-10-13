@@ -7,6 +7,7 @@ async function refresh() {
 }
 function render() {
   if (!state) return;
+  $('temporary').textContent = `临时访问 · ${settings.temporaryMinutes} 分钟`;
   $('temporary').hidden = state.phase !== 'cooldown' || !!state.temporary;
   $('end').hidden = state.phase !== 'active' && !state.temporary;
   $('end').textContent = state.temporary ? '结束临时访问' : '结束本次浏览';

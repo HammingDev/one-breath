@@ -28,6 +28,7 @@ try {
   await page.screenshot({ path: `${root}/output/playwright/breath.png`, fullPage: false });
   const settings = await context.newPage();
   await settings.goto(base + 'settings.html');
+  assert.equal(await settings.locator('#temporary').inputValue(), '15');
   await settings.locator('#visit').fill('3');
   await settings.locator('#cooldown').fill('20');
   await settings.getByRole('button', { name: '保存偏好' }).click();
@@ -80,7 +81,7 @@ try {
   const temporary = await settings.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
   assert.equal(temporary.state.readyAt, originalReadyAt);
   assert.equal(temporary.accessState.temporary, true);
-  assert.ok(temporary.state.temporary.endsAt - Date.now() <= 180000);
+  assert.ok(temporary.state.temporary.endsAt - Date.now() <= 900000);
   const extra = await context.newPage();
   await extra.goto('https://twitter.com/home');
   await extra.getByRole('heading', { name: 'Mock feed' }).waitFor();
@@ -102,9 +103,32 @@ try {
   assert.equal(afterTemp.state.temporary, undefined);
   await blocked.getByRole('heading', { name: '休息一下。' }).waitFor();
   await blocked.screenshot({ path: `${root}/output/playwright/temporary.png`, fullPage: false });
+  // A custom one-minute session immediately exposes the warning and extension action.
+  await settings.locator('#temporary').fill('1');
+  await settings.getByRole('button', { name: '保存偏好' }).click();
+  await blocked.getByRole('button', { name: '临时访问 · 1 分钟', exact: true }).waitFor();
   // Closing the final target page also ends a temporary session without resetting cooldown.
   await blocked.locator('#temporary').click();
   await blocked.waitForURL('https://x.com/home');
+  const beforeExtension = await settings.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
+  assert.ok(beforeExtension.state.temporary.endsAt - Date.now() <= 60000);
+  // CDP can inspect the content script's closed shadow root without changing production code.
+  const cdp = await context.newCDPSession(blocked);
+  const { root: dom } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+  function findExtend(node) {
+    if (node.nodeName === 'BUTTON' && node.attributes?.includes('extend')) return node;
+    for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) { const found = findExtend(child); if (found) return found; }
+  }
+  const button = findExtend(dom);
+  assert.ok(button);
+  const { object } = await cdp.send('DOM.resolveNode', { nodeId: button.nodeId });
+  const { result } = await cdp.send('Runtime.callFunctionOn', { objectId: object.objectId, functionDeclaration: 'function() { const visible = !this.hidden; this.click(); return visible; }', returnByValue: true });
+  assert.equal(result.value, true);
+  await settings.waitForFunction(async endsAt => (await chrome.runtime.sendMessage({ type: 'STATUS' })).state.temporary.endsAt === endsAt + 300000, beforeExtension.state.temporary.endsAt);
+  const extended = await settings.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
+  assert.equal(extended.state.temporary.endsAt, beforeExtension.state.temporary.endsAt + 300000);
+  assert.equal(extended.state.readyAt, originalReadyAt);
+  console.log('PASS: configurable temporary duration, one-minute warning and five-minute extension');
   await blocked.close();
   await settings.waitForFunction(async () => !(await chrome.runtime.sendMessage({ type: 'STATUS' })).state.temporary);
   assert.equal((await settings.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }))).state.readyAt, originalReadyAt);

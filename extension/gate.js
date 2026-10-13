@@ -17,6 +17,7 @@ async function refresh() {
 }
 function render() {
   if (!state) return;
+  $('temporary').textContent = `临时访问 · ${settings.temporaryMinutes} 分钟`;
   const now = Date.now();
   $('visual').classList.toggle('resting', state.phase === 'cooldown' && !state.temporary);
   $('visual').classList.toggle('eyes', state.phase === 'ready' && (challenge?.exercise || settings.exercise) === 'eyes');

@@ -22,7 +22,7 @@
 - 刷新、切换页面或新建标签页不会增加额度。
 - 到时替换为休息页；也可提前结束本次浏览。
 - 冷却结束不自动放行，由你决定何时开始下一次。
-- 冷却期间可手动开启 3 分钟临时访问，原冷却截止时间保持不变。
+- 冷却期间可手动开启临时访问（默认 15 分钟，可设置），原冷却截止时间保持不变。
 - 设置和计时状态在本地保存，无需账号、无广告、无遥测。
 
 请注意：这是自我约束工具，不阻止卸载或禁用。不跨浏览器、Chrome 身份或设备同步；无痕模式不启用。操作系统暂停进程时无法执行定时回调，恢复时会依据截止时间检查。
@@ -64,7 +64,7 @@
 
 ## 素材与上传包
 
-运行 `npm run package`，上传 `dist/one-breath-0.3.0-store.zip`。manifest.json 已置于 ZIP 根目录，排除浏览器生成的 _metadata、测试及本机文件。
+运行 `npm run package`，上传 `dist/one-breath-0.4.0-store.zip`。manifest.json 已置于 ZIP 根目录，排除浏览器生成的 _metadata、测试及本机文件。
 
 - 图标：extension/icons/128.png。
 - 产品截图：docs/screenshots/breath.png、settings.png、cooldown.png（1280 × 800）。
@@ -82,3 +82,5 @@
 - https://developer.chrome.com/docs/webstore/publish
 - https://developer.chrome.com/docs/webstore/cws-dashboard-privacy/
 - https://developer.chrome.com/docs/webstore/program-policies/policies
+
+临时访问默认 15 分钟，可在设置中调整为 1–120 分钟。剩余 1 分钟时，网页右下角提醒并提供「再加 5 分钟」，续时仍保留原冷却截止时间。

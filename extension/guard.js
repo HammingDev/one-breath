@@ -17,6 +17,7 @@
     document.documentElement?.setAttribute('data-one-breath-allowed', '');
     timer = setTimeout(block, Math.max(0, deadline - Date.now()));
     mount();
+    tick();
   }
   async function check() {
     if (checking) return;
@@ -27,15 +28,26 @@
       if (!result?.ok) block(); else apply(result.accessState);
     } catch { block(); } finally { checking = false; }
   }
-  let label, host;
+  let label, host, extendButton, notice, noticeError = '';
   function mount() {
     if (!document.documentElement || host?.isConnected) return;
     host = document.createElement('div');
     host.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:2147483647;';
     const shadow = host.attachShadow({ mode: 'closed' });
-    shadow.innerHTML = `<style>:host{all:initial}div{display:flex;align-items:center;gap:16px;padding:12px 16px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;color:#252525;font:13px system-ui}span{font-variant-numeric:tabular-nums}button{background:none;border:0;color:#252525;cursor:pointer;font:inherit;text-decoration:underline;text-underline-offset:4px}button:focus-visible{outline:2px solid #777}</style><div><span></span><button>结束浏览</button></div>`;
+    shadow.innerHTML = `<style>:host{all:initial}div{display:flex;flex-wrap:wrap;max-width:calc(100vw - 72px);align-items:center;gap:16px;padding:12px 16px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;color:#252525;font:13px system-ui}span{font-variant-numeric:tabular-nums}button{background:none;border:0;color:#252525;cursor:pointer;font:inherit;text-decoration:underline;text-underline-offset:4px}[hidden]{display:none}strong{font-weight:500}button:focus-visible{outline:2px solid #777}</style><div><span></span><strong role="status" hidden>即将结束</strong><button id="extend" hidden>再加 5 分钟</button><button id="end">结束浏览</button></div>`;
     label = shadow.querySelector('span');
-    shadow.querySelector('button').onclick = async () => { try { await chrome.runtime.sendMessage({ type: 'END' }); } finally { block(); } };
+    shadow.querySelector('#end').onclick = async () => { try { await chrome.runtime.sendMessage({ type: 'END' }); } finally { block(); } };
+    extendButton = shadow.querySelector('#extend');
+    notice = shadow.querySelector('strong');
+    extendButton.onclick = async () => {
+      extendButton.disabled = true;
+      try {
+        const result = await chrome.runtime.sendMessage({ type: 'EXTEND_TEMPORARY', endsAt: deadline });
+        if (result?.ok) { noticeError = ''; apply(result.accessState); }
+        else noticeError = result?.error || '续时失败，请重试';
+      } catch { noticeError = '续时失败，请重试'; }
+      finally { extendButton.disabled = false; tick(); }
+    };
     document.documentElement.append(host);
     tick();
   }
@@ -43,6 +55,9 @@
     if (deadline && Date.now() >= deadline) { block(); return; }
     if (label) {
       const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      extendButton.hidden = !temporary || seconds > 60;
+      notice.hidden = !temporary || seconds > 60;
+      if (!notice.hidden) notice.textContent = noticeError || '即将结束 · 需要更多时间？';
       label.textContent = `一息 · ${temporary ? '临时访问' : '剩余'} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
     }
   }

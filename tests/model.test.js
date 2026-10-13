@@ -62,7 +62,23 @@ test('cooldown can finish during temporary access without discarding its timer',
   const temp = startTemporary({ phase: 'cooldown', endedAt: 0, readyAt: 10000 }, 1000, 1);
   const afterCooldown = settle(temp, 10000);
   assert.equal(afterCooldown.phase, 'ready');
-  assert.equal(afterCooldown.temporary.endsAt, 181000);
-  assert.deepEqual(settle(afterCooldown, 181000), ready);
+  assert.equal(afterCooldown.temporary.endsAt, 901000);
+  assert.deepEqual(settle(afterCooldown, 901000), ready);
   assert.deepEqual(finish(afterCooldown, 12000), ready);
+});
+
+import { extendTemporary } from '../extension/model.js';
+test('legacy settings migrate to 15 minutes and custom duration is validated', () => {
+  assert.equal(validateSettings({ visitMinutes: 5, cooldownMinutes: 60, exercise: 'breath' }).temporaryMinutes, 15);
+  for (const temporaryMinutes of [0, 121, 1.5, '15']) assert.throws(() => validateSettings({ ...DEFAULTS, temporaryMinutes }));
+  const temp = startTemporary({ phase: 'cooldown', readyAt: 3600000 }, 0, 1, 20);
+  assert.equal(temp.temporary.endsAt, 1200000);
+});
+test('extension adds five minutes once per observed deadline and retains cooldown', () => {
+  const temp = startTemporary({ phase: 'cooldown', readyAt: 3600000 }, 0, 1);
+  const extended = extendTemporary(temp, 850000, temp.temporary.endsAt);
+  assert.equal(extended.temporary.endsAt, 1200000);
+  assert.equal(extended.readyAt, temp.readyAt);
+  assert.deepEqual(extendTemporary(extended, 850001, temp.temporary.endsAt), extended);
+  assert.throws(() => extendTemporary(temp, 900000, 900000));
 });
