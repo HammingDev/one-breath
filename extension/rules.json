@@ -1,0 +1,1 @@
+[{ "id": 1, "priority": 1, "action": { "type": "redirect", "redirect": { "extensionPath": "/gate.html" } }, "condition": { "requestDomains": ["x.com", "twitter.com"], "resourceTypes": ["main_frame"] } }]

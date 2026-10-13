@@ -1,0 +1,20 @@
+{
+  "name": "one-breath",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node tests/browser-smoke.mjs && node tests/ui-smoke.mjs && node tests/lifecycle-smoke.mjs",
+    "package": "python3 scripts/package.py"
+  },
+  "license": "MIT",
+  "description": "Mindful browsing sessions and cooldowns for X / Twitter.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HammingDev/one-breath.git"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

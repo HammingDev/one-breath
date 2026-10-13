@@ -1,0 +1,1 @@
+html:not([data-one-breath-allowed]) { visibility: hidden !important; pointer-events: none !important; }

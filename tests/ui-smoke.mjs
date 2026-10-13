@@ -1,0 +1,36 @@
+import { createRequire } from 'node:module';
+import { mkdtemp, rm, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const root = path.resolve(import.meta.dirname, '..');
+await mkdir(path.join(root, 'output/playwright'), { recursive: true });
+const profile = await mkdtemp(path.join(tmpdir(), 'one-breath-ui-'));
+const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${root}/extension`, `--load-extension=${root}/extension`] });
+try {
+  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+  const base = `chrome-extension://${new URL(worker.url()).host}/`;
+  const preferences = await context.newPage();
+  await preferences.goto(base + 'settings.html');
+  await preferences.locator('#exercise').selectOption('eyes');
+  await preferences.getByRole('button', { name: '保存偏好' }).click();
+  await preferences.getByText('已保存 · 下一次新会话生效').waitFor();
+  const eyes = await context.newPage();
+  await eyes.goto(base + 'gate.html');
+  await eyes.getByRole('heading', { name: '让眼睛休息一下。' }).waitFor();
+  assert.equal(await eyes.locator('#begin').isDisabled(), true);
+  await eyes.setViewportSize({ width: 390, height: 844 });
+  await eyes.screenshot({ path: `${root}/output/playwright/eyes-mobile.png`, fullPage: true });
+  await eyes.locator('#leave').click();
+  const status = await preferences.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
+  assert.equal(status.state.phase, 'ready');
+  const popup = await context.newPage();
+  await popup.goto(base + 'popup.html');
+  await popup.getByRole('heading', { name: '可以开始新的一次' }).waitFor();
+  assert.equal(await popup.locator('#end').isVisible(), false);
+  await popup.setViewportSize({ width: 300, height: 420 });
+  await popup.screenshot({ path: `${root}/output/playwright/popup.png`, fullPage: true });
+  console.log('PASS: eye-rest preference, leave without consuming a session, and popup state');
+} finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
