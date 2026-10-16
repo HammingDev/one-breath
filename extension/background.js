@@ -42,8 +42,9 @@ async function persist() {
   await schedule();
   const tabs = await chrome.tabs.query({});
   await Promise.allSettled(tabs.filter(t => isTarget(t.url)).map(async t => {
-    if (state.phase !== 'active' && !state.temporary && !isGate(t.pendingUrl)) await chrome.tabs.update(t.id, { url: gate + '#' + t.url });
-    else await chrome.tabs.sendMessage(t.id, { type: 'STATE', state: accessState(state) });
+    // The page decides whether it is safe to leave: only it can see an unfinished composer.
+    // Do not redirect on message failure either; an old/unresponsive script may hold a draft.
+    await chrome.tabs.sendMessage(t.id, { type: 'STATE', state: accessState(state) });
   }));
 }
 async function normalize() {

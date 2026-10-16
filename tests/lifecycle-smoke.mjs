@@ -27,6 +27,9 @@ try {
   await a.waitForURL('https://x.com/');
   const b = await context.newPage();
   await b.goto('https://twitter.com/home');
+  const writing = await context.newPage();
+  await writing.goto('https://x.com/compose/post');
+  await writing.evaluate(() => { const editor = document.createElement('div'); editor.contentEditable = 'true'; editor.setAttribute('role', 'textbox'); editor.textContent = 'Keep this draft'; document.body.append(editor); });
   const snapshot = await control.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
   const deadline = snapshot.state.endsAt;
   await control.bringToFront();
@@ -43,6 +46,25 @@ try {
   assert.equal(cooled.state.readyAt, deadline + 60000);
   assert.ok(Date.now() - deadline < 3000, 'deadline interception should be prompt');
   console.log('PASS: continuous browsing expires in both tabs without navigating; cooldown uses original deadline');
+  assert.equal(writing.url(), 'https://x.com/compose/post');
+  assert.equal(await writing.locator('[role=textbox]').textContent(), 'Keep this draft');
+  const draftCdp = await context.newCDPSession(writing);
+  const { root: draftDom } = await draftCdp.send('DOM.getDocument', { depth: -1, pierce: true });
+  function findButton(node, id) {
+    if (node.nodeName === 'BUTTON' && node.attributes?.includes(id)) return node;
+    for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) { const found = findButton(child, id); if (found) return found; }
+  }
+  async function clickProtected(id) {
+    const node = findButton(draftDom, id); assert.ok(node);
+    const { object } = await draftCdp.send('DOM.resolveNode', { nodeId: node.nodeId });
+    const { result } = await draftCdp.send('Runtime.callFunctionOn', { objectId: object.objectId, functionDeclaration: 'function() { const visible = !this.hidden; this.click(); return visible; }', returnByValue: true });
+    assert.equal(result.value, true);
+  }
+  await clickProtected('keep');
+  assert.equal(writing.url(), 'https://x.com/compose/post');
+  await clickProtected('end');
+  await writing.waitForURL(base + 'gate.html**');
+  console.log('PASS: natural expiry preserves draft, continue keeps page, explicit confirmation leaves');
   await context.close();
   context = await chromium.launchPersistentContext(profile, options);
   const restored = await context.newPage();

@@ -1,6 +1,6 @@
 # Privacy Policy / 隐私政策
 
-Last updated / 更新日期：2026-10-13
+Last updated / 更新日期：2026-10-16
 
 One Breath（「一息」）的唯一用途是通过打开前的短暂休息、共享浏览时长和结束后的冷却，帮助用户控制对 X / Twitter 网站的访问。
 
@@ -11,9 +11,11 @@ One Breath（「一息」）的唯一用途是通过打开前的短暂休息、�
 - 休息练习的随机校验标识、开始时间和时长临时保存在 `chrome.storage.session`。
 - 被拦截的 X / Twitter 原始 URL（可能含路径、搜索参数）保留在本地提醒页的地址片段中，用于在用户选择继续时返回原页面。该地址可能出现在浏览器历史记录或其同步中，取决于用户的 Chrome 设置；插件不控制 Chrome 自身的数据处理。
 
+- 写作保护仅在当前 X / Twitter 页面内检查可编辑输入框是否有文字、是否聚焦，以及近期是否点击发布；不保存或传输输入内容，后台也不接收草稿内容。保护状态仅存在该页面内存中。
+
 ## 不上传、不售卖
 
-插件没有开发者服务器，不向开发者或第三方发送上述信息。不含广告、遥测、分析 SDK 或远程执行的代码。不读取 Cookie、账户凭据、私信内容或页面正文。访问 X / Twitter 后，该网站自身的数据处理受其隐私政策约束。
+插件没有开发者服务器，不向开发者或第三方发送上述信息。不含广告、遥测、分析 SDK 或远程执行的代码。不读取 Cookie 或账户凭据；除检查可编辑输入框以保护未完成写作外，不采集页面正文。访问 X / Twitter 后，该网站自身的数据处理受其隐私政策约束。
 
 数据只用于实现上述用户可见功能，不用于广告、用户画像、售卖、信用评估或放贷。One Breath 对用户数据的使用遵守 Chrome Web Store User Data Policy，包括 Limited Use 要求。
 
@@ -41,6 +43,6 @@ One Breath（「一息」）的唯一用途是通过打开前的短暂休息、�
 
 One Breath limits access to X / Twitter using a short pause, a shared timed session and a cooldown. All extension processing is local. It reads tab URLs and IDs to identify target pages and stores settings and current session timestamps/IDs in local Chrome extension storage. Exercise challenges are temporary session data. The original target URL is retained in the local intervention page fragment so that users can return to it; Chrome may retain or sync browsing history according to the user's browser settings.
 
-The extension has no developer backend, analytics, advertising, remote code, or data sale. It does not read cookies, credentials, private messages or page text. No information is transmitted to the developer or third parties by the extension. Normal browsing on X / Twitter is governed by that site's own policies. Extension data use complies with the Chrome Web Store User Data Policy, including Limited Use requirements.
+The extension has no developer backend, analytics, advertising, remote code, or data sale. It does not read cookies or credentials. Draft protection checks editable text and focus locally in the current page; no draft text is stored or sent to the background worker or any server. No information is transmitted to the developer or third parties by the extension. Normal browsing on X / Twitter is governed by that site's own policies. Extension data use complies with the Chrome Web Store User Data Policy, including Limited Use requirements.
 
 Uninstalling removes extension storage; browser history is managed separately in Chrome. For support, use the repository Issues without posting sensitive information.
