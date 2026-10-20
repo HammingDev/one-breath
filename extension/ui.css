@@ -6,3 +6,5 @@
 .temporary{margin:8px 0 24px}.temporary .secondary{font-size:11px;padding:8px 14px;min-height:34px}.temporary .detail{font-size:10px;margin-top:8px}
 
 .temporary:has(button[hidden]){display:none}
+
+.work-form{margin-top:24px;padding-top:20px;border-top:1px solid #e5e5e5}.work-form label{font-size:13px}.work-form input{width:72px;padding:8px;border:1px solid #ddd;border-radius:4px;background:transparent;color:inherit;font:inherit}.work-form .detail{font-size:12px;line-height:1.6}

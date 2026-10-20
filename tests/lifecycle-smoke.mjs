@@ -100,4 +100,27 @@ try {
   await eyes.getByRole('heading', { name: '让眼睛休息一下。' }).waitFor();
   assert.equal(await eyes.locator('#begin').isDisabled(), true);
   console.log('PASS: leaving exercise consumes no session; eye-rest preference applies');
+  await preferences.evaluate(() => chrome.runtime.sendMessage({ type: 'START_WORK', minutes: 60 }));
+  const work = await preferences.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
+  // Shortened persisted fixture tests restart and the actual work-mode alarm without waiting an hour.
+  const workDeadline = Date.now() + 12000;
+  await preferences.evaluate(async endsAt => {
+    const { state } = await chrome.storage.local.get('state');
+    await chrome.storage.local.set({ state: { ...state, endsAt } });
+  }, workDeadline);
+  await context.close();
+  context = await chromium.launchPersistentContext(profile, options);
+  await context.route(/^https:\/\/([^/]+\.)?(x\.com|twitter\.com)\//, route => route.fulfill({ contentType: 'text/html', body: '<h1>Work feed</h1>' }));
+  const workControl = await context.newPage();
+  await workControl.goto(base + 'popup.html');
+  await workControl.getByRole('heading', { name: '工作模式中' }).waitFor();
+  const restoredWork = await workControl.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
+  assert.equal(restoredWork.state.endsAt, workDeadline);
+  const workTab = await context.newPage();
+  await workTab.goto('https://x.com/home');
+  await workTab.getByRole('heading', { name: 'Work feed' }).waitFor();
+  await workTab.waitForURL(base + 'gate.html**', { timeout: 20000 });
+  const workCooled = await workControl.evaluate(() => chrome.runtime.sendMessage({ type: 'STATUS' }));
+  assert.equal(workCooled.state.readyAt, workDeadline + work.state.cooldownMs);
+  console.log('PASS: work mode survives browser restart and automatically ends at original deadline');
 } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }

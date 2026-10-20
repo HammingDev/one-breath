@@ -1,4 +1,4 @@
-import { DEFAULTS, isTarget, safeTarget, validateSettings, settle, start, finish, startTemporary, accessState, extendTemporary } from './model.js';
+import { DEFAULTS, isTarget, safeTarget, validateSettings, settle, start, finish, startTemporary, accessState, extendTemporary, startWork } from './model.js';
 const gate = chrome.runtime.getURL('gate.html');
 let state, settings, ruleMode;
 let queue = Promise.resolve();
@@ -18,7 +18,7 @@ async function init() {
   await schedule();
 }
 async function syncRules() {
-  const active = state.phase === 'active' || !!state.temporary;
+  const active = ['active', 'work'].includes(state.phase) || !!state.temporary;
   if (ruleMode === active) return;
   const addRules = [{ id: 10, priority: 2,
     action: { type: 'redirect', redirect: { regexSubstitution: gate + '#\\0' } },
@@ -30,11 +30,11 @@ async function syncRules() {
 }
 async function schedule() {
   await chrome.alarms.clear('boundary');
-  const deadlines = [state.phase === 'active' ? state.endsAt : state.phase === 'cooldown' ? state.readyAt : null, state.temporary?.endsAt].filter(Boolean);
+  const deadlines = [['active', 'work'].includes(state.phase) ? state.endsAt : state.phase === 'cooldown' ? state.readyAt : null, state.temporary?.endsAt].filter(Boolean);
   const when = deadlines.length ? Math.min(...deadlines) : null;
   if (when) await chrome.alarms.create('boundary', { when });
   await chrome.action.setBadgeBackgroundColor({ color: '#252525' });
-  await chrome.action.setBadgeText({ text: state.temporary ? '临时' : state.phase === 'active' ? '浏览' : state.phase === 'cooldown' ? '休息' : '' });
+  await chrome.action.setBadgeText({ text: state.phase === 'work' ? '工作' : state.temporary ? '临时' : state.phase === 'active' ? '浏览' : state.phase === 'cooldown' ? '休息' : '' });
 }
 async function persist() {
   await chrome.storage.local.set({ state });
@@ -75,6 +75,11 @@ async function handle(msg, sender) {
     state = finish(state, Date.now()); await persist(); return { state, settings };
   }
   if (!extensionUI(sender)) throw new Error('请从插件页面操作。');
+  if (msg.type === 'START_WORK') {
+    state = startWork(settings, Date.now(), msg.minutes);
+    await persist();
+    return { state, settings };
+  }
   if (msg.type === 'TEMPORARY') {
     if (!state.temporary && state.phase !== 'cooldown') throw new Error('临时访问仅在休息期间可用。');
     const tab = isGate(sender.url) && sender.tab ? sender.tab : await chrome.tabs.create({ url: gate, active: true });
@@ -95,7 +100,7 @@ async function handle(msg, sender) {
   }
   if (msg.type === 'BEGIN') {
     if (!isGate(sender.url) || !sender.tab) throw new Error('请从访问提醒页开始。');
-    if (state.temporary) { await chrome.tabs.update(sender.tab.id, { url: safeTarget(msg.target) }); return { state, settings }; }
+    if (state.temporary || state.phase === 'work') { await chrome.tabs.update(sender.tab.id, { url: safeTarget(msg.target) }); return { state, settings }; }
     if (state.phase === 'cooldown') throw new Error('还在休息时间，稍后再来。');
     if (state.phase === 'ready') {
       const key = 'challenge' + sender.tab.id;

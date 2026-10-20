@@ -7,17 +7,19 @@ async function refresh() {
 }
 function render() {
   if (!state) return;
+  $('work-form').hidden = state.phase === 'work';
+  $('open').textContent = state.phase === 'work' ? '打开推特' : '打开推特提醒页';
   $('temporary').textContent = `临时访问 · ${settings.temporaryMinutes} 分钟`;
   $('temporary').hidden = state.phase !== 'cooldown' || !!state.temporary;
-  $('end').hidden = state.phase !== 'active' && !state.temporary;
-  $('end').textContent = state.temporary ? '结束临时访问' : '结束本次浏览';
-  $('title').textContent = state.temporary ? '临时访问中' : state.phase === 'active' ? '正在浏览' : state.phase === 'cooldown' ? '正在休息' : '可以开始新的一次';
-  $('count').textContent = state.temporary ? duration(state.temporary.endsAt - Date.now()) : state.phase === 'active' ? duration(state.endsAt - Date.now()) : state.phase === 'cooldown' ? duration(state.readyAt - Date.now()) : `${settings.visitMinutes} 分钟`;
-  $('description').textContent = state.temporary ? '原冷却时间继续计算，不会重新开始。' : state.phase === 'active' ? '所有推特标签页共用这份时间。' : state.phase === 'cooldown' ? `${timeLabel(state.readyAt)} 后可以开始下一次。` : `浏览结束后，休息 ${settings.cooldownMinutes} 分钟。`;
-  if ((state.temporary && Date.now() >= state.temporary.endsAt) || (state.phase === 'active' && Date.now() >= state.endsAt) || (state.phase === 'cooldown' && Date.now() >= state.readyAt)) void refresh();
+  $('end').hidden = !['active', 'work'].includes(state.phase) && !state.temporary;
+  $('end').textContent = state.phase === 'work' ? '结束工作模式' : state.temporary ? '结束临时访问' : '结束本次浏览';
+  $('title').textContent = state.phase === 'work' ? '工作模式中' : state.temporary ? '临时访问中' : state.phase === 'active' ? '正在浏览' : state.phase === 'cooldown' ? '正在休息' : '可以开始新的一次';
+  $('count').textContent = state.temporary ? duration(state.temporary.endsAt - Date.now()) : ['active', 'work'].includes(state.phase) ? duration(state.endsAt - Date.now()) : state.phase === 'cooldown' ? duration(state.readyAt - Date.now()) : `${settings.visitMinutes} 分钟`;
+  $('description').textContent = state.phase === 'work' ? `${timeLabel(state.endsAt)} 结束。期间自由访问，之后休息 ${state.cooldownMs / 60000} 分钟。` : state.temporary ? '原冷却时间继续计算，不会重新开始。' : state.phase === 'active' ? '所有推特标签页共用这份时间。' : state.phase === 'cooldown' ? `${timeLabel(state.readyAt)} 后可以开始下一次。` : `浏览结束后，休息 ${settings.cooldownMinutes} 分钟。`;
+  if ((state.temporary && Date.now() >= state.temporary.endsAt) || (['active', 'work'].includes(state.phase) && Date.now() >= state.endsAt) || (state.phase === 'cooldown' && Date.now() >= state.readyAt)) void refresh();
 }
 $('end').onclick = async () => { try { await request('END'); await refresh(); } catch (error) { $('error').textContent = error.message; } };
-$('open').onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL('gate.html') });
+$('open').onclick = () => chrome.tabs.create({ url: state?.phase === 'work' ? 'https://x.com/' : chrome.runtime.getURL('gate.html') });
 chrome.storage.onChanged.addListener(() => void refresh());
 setInterval(render, 1000);
 void refresh();
@@ -27,4 +29,11 @@ $('temporary').onclick = async () => {
   try { await request('TEMPORARY'); await refresh(); }
   catch (error) { $('error').textContent = error.message; }
   finally { $('temporary').disabled = false; }
+};
+
+$('work-form').onsubmit = async event => {
+  event.preventDefault(); $('work-start').disabled = true; $('error').textContent = '';
+  try { await request('START_WORK', { minutes: Number($('work-minutes').value) }); await refresh(); }
+  catch (error) { $('error').textContent = error.message; }
+  finally { $('work-start').disabled = false; }
 };

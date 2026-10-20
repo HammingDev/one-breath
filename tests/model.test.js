@@ -82,3 +82,15 @@ test('extension adds five minutes once per observed deadline and retains cooldow
   assert.deepEqual(extendTemporary(extended, 850001, temp.temporary.endsAt), extended);
   assert.throws(() => extendTemporary(temp, 900000, 900000));
 });
+
+import { startWork } from '../extension/model.js';
+test('work mode grants exact duration and starts cooldown at end or early finish', () => {
+  const work = startWork(DEFAULTS, 1000, 120);
+  assert.equal(work.endsAt, 7201000);
+  assert.equal(accessState(work).work, true);
+  assert.equal(settle(work, 7200999).phase, 'work');
+  assert.equal(settle(JSON.parse(JSON.stringify(work)), 7201000).readyAt, 10801000);
+  assert.equal(finish(work, 2000).readyAt, 3602000);
+  assert.equal(settle(work, 10801000).phase, 'ready');
+  for (const minutes of [0, 1441, 1.5, '60', NaN]) assert.throws(() => startWork(DEFAULTS, 0, minutes));
+});

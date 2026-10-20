@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "一息 · One Breath",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "打开推特前，留一息给自己。共享浏览额度，结束后再冷却。",
   "minimum_chrome_version": "120",
   "permissions": [

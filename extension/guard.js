@@ -1,5 +1,5 @@
 (() => {
-  let deadline = 0, timer, checking = false, blocking = false, temporary = false;
+  let deadline = 0, timer, checking = false, blocking = false, temporary = false, work = false;
   const gate = chrome.runtime.getURL('gate.html');
   let protectedDraft = false, snoozeUntil = 0, postingUntil = 0;
   const composerSelector = '[contenteditable="true"][role="textbox"], [contenteditable="true"][data-testid^="tweetTextarea"], textarea';
@@ -12,6 +12,8 @@
     if (blocking) return;
     if (!force && (protectedDraft || hasDraft())) {
       protectedDraft = true;
+      work = false;
+      if (host) host.style.removeProperty('display');
       clearTimeout(timer);
       document.documentElement?.setAttribute('data-one-breath-allowed', '');
       mount();
@@ -26,6 +28,8 @@
   }
   function apply(state) {
     clearTimeout(timer);
+    work = !!state.work;
+    if (host) host.style.removeProperty('display');
     if (state.phase !== 'active' || state.endsAt <= Date.now()) { block(); return; }
     protectedDraft = false; snoozeUntil = 0;
     deadline = state.endsAt;
@@ -37,7 +41,6 @@
   }
   async function check() {
     if (checking) return;
-    if (deadline && Date.now() >= deadline) { block(); return; }
     checking = true;
     try {
       const result = await chrome.runtime.sendMessage({ type: 'STATUS' });
@@ -55,6 +58,7 @@
     endButton.textContent = '已保存，确认离开';
   }
   function mount() {
+    if (work) { if (host) host.style.setProperty('display', 'none', 'important'); return; }
     if (!document.documentElement || host?.isConnected) return;
     host = document.createElement('div');
     host.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:2147483647;';
@@ -83,6 +87,8 @@
     if (!protectedDraft) tick();
   }
   function tick() {
+    if (work && deadline > Date.now()) { if (host) host.style.setProperty('display', 'none', 'important'); return; }
+    if (host) host.style.removeProperty('display');
     if (protectedDraft) { renderProtection(); return; }
     if (deadline && Date.now() >= deadline) { block(); return; }
     if (label) {

@@ -16,6 +16,7 @@ export function validateSettings(input) {
 }
 export const TEMPORARY_MS = DEFAULTS.temporaryMinutes * 60000;
 export function accessState(state) {
+  if (state.phase === 'work') return { phase: 'active', endsAt: state.endsAt, work: true };
   return state.temporary ? { phase: 'active', endsAt: state.temporary.endsAt, temporary: true } : state;
 }
 export function startTemporary(state, now, tabId, minutes = DEFAULTS.temporaryMinutes) {
@@ -26,7 +27,7 @@ export function startTemporary(state, now, tabId, minutes = DEFAULTS.temporaryMi
 }
 export function settle(state, now) {
   if (state.temporary && now >= state.temporary.endsAt) { const { temporary, ...rest } = state; state = rest; }
-  if (state.phase === 'active' && now >= state.endsAt) return settle(finish(state, state.endsAt), now);
+  if (['active', 'work'].includes(state.phase) && now >= state.endsAt) return settle(finish(state, state.endsAt), now);
   if (state.phase === 'cooldown' && now >= state.readyAt) return { phase: 'ready', ...(state.temporary ? { temporary: state.temporary } : {}) };
   return state;
 }
@@ -37,7 +38,7 @@ export function start(state, settings, now, tabId) {
 }
 export function finish(state, now) {
   if (state.temporary) { const { temporary, ...rest } = state; return settle(rest, now); }
-  if (state.phase !== 'active') return state;
+  if (!['active', 'work'].includes(state.phase)) return state;
   const endedAt = Math.min(now, state.endsAt);
   return { phase: 'cooldown', endedAt, readyAt: endedAt + state.cooldownMs };
 }
@@ -51,4 +52,9 @@ export function extendTemporary(state, now, expectedEndsAt) {
   if (!state.temporary) throw new Error('临时访问已结束。');
   if (state.temporary.endsAt !== expectedEndsAt) return state;
   return { ...state, temporary: { ...state.temporary, endsAt: state.temporary.endsAt + 5 * 60000 } };
+}
+
+export function startWork(settings, now, minutes) {
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error('工作时长应为 1–1440 分钟的整数。');
+  return { phase: 'work', startedAt: now, endsAt: now + minutes * 60000, cooldownMs: settings.cooldownMinutes * 60000 };
 }

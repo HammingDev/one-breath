@@ -35,12 +35,12 @@ function render() {
     $('begin').hidden = true;
     $('detail').textContent = '休息结束后，也由你决定是否开始。';
     if (now >= state.readyAt) void refresh();
-  } else if (state.phase === 'active' || state.temporary) {
+  } else if (['active', 'work'].includes(state.phase) || state.temporary) {
     const endsAt = state.temporary?.endsAt || state.endsAt;
     challenge = null;
     $('phase').textContent = duration(endsAt - now);
     $('phase').className = 'phase count';
-    $('title').textContent = state.temporary ? '临时访问中。' : '继续本次浏览。';
+    $('title').textContent = state.phase === 'work' ? '工作模式已开启。' : state.temporary ? '临时访问中。' : '继续本次浏览。';
     $('description').textContent = '所有推特标签页，共享这段剩余时间。';
     $('begin').textContent = '继续本次浏览';
     $('begin').disabled = busy;
